@@ -58,8 +58,8 @@ set(boost_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external/boost)
 ExternalProject_Add(
     boost
     PREFIX ${boost_PREFIX}
-    URL "http://netcologne.dl.sourceforge.net/project/boost/boost/1.69.0/boost_1_69_0.tar.gz"
-    URL_MD5 "b50944c0c13f81ce2c006802a1186f5a"
+    URL "https://jaist.dl.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
+    URL_MD5 "fea771fe8176828fabf9c09242ee8c26"
     CONFIGURE_COMMAND ${boost_PREFIX}/src/boost/bootstrap.sh --with-libraries=serialization,filesystem,system,program_options,iostreams --prefix=${boost_PREFIX}
     BUILD_COMMAND ./bjam link=static cxxflags='-fPIC'
     INSTALL_COMMAND ./bjam link=static install
@@ -157,26 +157,6 @@ ExternalProject_Add(
 )
 include_directories(${cereal_PREFIX}/include)
 
-set(avro_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external/avro)
-ExternalProject_Add(
-    avro
-    DEPENDS boost
-    PREFIX ${avro_PREFIX}
-    URL "http://www.eu.apache.org/dist/avro/avro-1.8.2/avro-src-1.8.2.tar.gz"
-    URL_MD5 "cb56b43eb45c3db13a35b56f6df633e2"
-    CONFIGURE_COMMAND cmake -DBOOST_INCLUDEDIR=${boost_PREFIX}/include -DBOOST_LIBRARYDIR=${boost_PREFIX}/lib -DBoost_NO_SYSTEM_PATHS=ON -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_INSTALL_PREFIX=${avro_PREFIX} -DBUILD_SHARED_LIBS=OFF ${avro_PREFIX}/src/avro/lang/c++/
-    # Due to some issues with using statically built boost libraries AND zlib in avro tests
-    # build only necessary parts and install them in a very hackish way.
-    BUILD_COMMAND $(MAKE) avrocpp_s avrogencpp
-    INSTALL_COMMAND mkdir -p ${avro_PREFIX}/include/avro ${avro_PREFIX}/lib ${avro_PREFIX}/bin && cp ${avro_PREFIX}/src/avro-build/avrogencpp ${avro_PREFIX}/bin && cp ${avro_PREFIX}/src/avro-build/libavrocpp_s.a ${avro_PREFIX}/lib && cd ${avro_PREFIX}/src/avro/lang/c++/api/ && cp -r . ${avro_PREFIX}/include/avro/
-    LOG_UPDATE ON
-    LOG_CONFIGURE ON
-    LOG_BUILD ON
-)
-include_directories(${avro_PREFIX}/include)
-set(AVRO_LIBRARIES ${avro_PREFIX}/lib/libavrocpp_s.a)
-set(AVRO_GENERATOR ${avro_PREFIX}/bin/avrogencpp)
-
 set(flatbuffers_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external/flatbuffers)
 ExternalProject_Add(
     flatbuffers
@@ -210,7 +190,6 @@ set(LINKLIBS
     ${PROTOBUF_LIBRARIES}
     ${CAPNPROTO_LIBRARIES}
     ${BOOST_LIBRARIES}
-    ${AVRO_LIBRARIES}
     ${FLATBUFFERS_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     ${ZLIB_LIBRARIES}
@@ -264,19 +243,6 @@ set_source_files_properties(
 set(CAPNPROTO_SERIALIZATION_SOURCES  ${cpp_serializers_SOURCE_DIR}/capnproto/test.capnp.c++)
 
 add_custom_command(
-    DEPENDS ${cpp_serializers_SOURCE_DIR}/test.json
-    COMMAND ${AVRO_GENERATOR}
-    ARGS --input ${cpp_serializers_SOURCE_DIR}/test.json --output ${cpp_serializers_SOURCE_DIR}/avro/record.hpp --namespace avro_test
-    OUTPUT  "${cpp_serializers_SOURCE_DIR}/avro/record.hpp"
-    COMMENT "Executing Avro compiler"
-)
-set_source_files_properties(
-    ${cpp_serializers_SOURCE_DIR}/avro/record.hpp
-    PROPERTIES GENERATED TRUE
-)
-set(AVRO_SERIALIZATION_SOURCES ${cpp_serializers_SOURCE_DIR}/avro/record.hpp)
-
-add_custom_command(
     DEPENDS ${cpp_serializers_SOURCE_DIR}/test.fbs
     COMMAND ${FLATBUFFERS_GENERATOR}
     ARGS --cpp -o ${cpp_serializers_SOURCE_DIR}/flatbuffers ${cpp_serializers_SOURCE_DIR}/test.fbs
@@ -301,10 +267,9 @@ add_executable(
     ${CAPNPROTO_SERIALIZATION_SOURCES}
     ${BOOST_SERIALIZATION_SOURCES}
     ${CEREAL_SERIALIZATION_SOURCES}
-    ${AVRO_SERIALIZATION_SOURCES}
     ${FLATBUFFERS_SERIALIZATION_SOURCES}
     ${YAS_SERIALIZATION_SOURCES}
 )
-add_dependencies(benchmark thrift msgpack protobuf capnproto boost cereal avro flatbuffers yas)
+add_dependencies(benchmark thrift msgpack protobuf capnproto boost cereal flatbuffers yas)
 target_link_libraries(benchmark ${LINKLIBS})
 set_target_properties(benchmark PROPERTIES COMPILE_FLAGS "-std=c++14")
