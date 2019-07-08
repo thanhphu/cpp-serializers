@@ -23,7 +23,6 @@
 #include "boost/record.hpp"
 #include "msgpack/record.hpp"
 #include "cereal/record.hpp"
-#include "avro/record.hpp"
 #include "flatbuffers/test_generated.h"
 #include "yas/record.hpp"
 
@@ -352,59 +351,6 @@ cereal_serialization_test(size_t iterations)
 }
 
 void
-avro_serialization_test(size_t iterations)
-{
-    using namespace avro_test;
-
-    Record r1, r2;
-
-    for (size_t i = 0; i < kIntegers.size(); i++) {
-        r1.ids.push_back(kIntegers[i]);
-    }
-
-    for (size_t i = 0; i < kStringsCount; i++) {
-        r1.strings.push_back(kStringValue);
-    }
-
-    std::unique_ptr<avro::OutputStream> out = avro::memoryOutputStream();
-    avro::EncoderPtr encoder = avro::binaryEncoder();
-
-    encoder->init(*out);
-    avro::encode(*encoder, r1);
-
-    auto serialized_size = out->byteCount();
-
-    std::unique_ptr<avro::InputStream> in = avro::memoryInputStream(*out);
-    avro::DecoderPtr decoder = avro::binaryDecoder();
-
-    decoder->init(*in);
-    avro::decode(*decoder, r2);
-
-    if (r1.ids != r2.ids || r1.strings != r2.strings || r2.ids.size() != kIntegers.size() || r2.strings.size() != kStringsCount) {
-        throw std::logic_error("avro's case: deserialization failed");
-    }
-
-    std::cout << "avro: size = " << serialized_size << " bytes" << std::endl;
-
-    auto start = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < iterations; i++) {
-        auto out = avro::memoryOutputStream();
-        auto encoder = avro::binaryEncoder();
-        encoder->init(*out);
-        avro::encode(*encoder, r1);
-
-        auto in = avro::memoryInputStream(*out);
-        auto decoder = avro::binaryDecoder();
-        decoder->init(*in);
-        avro::decode(*decoder, r2);
-    }
-    auto finish = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
-
-    std::cout << "avro: time = " << duration << " milliseconds" << std::endl << std::endl;
-}
-
-void
 flatbuffers_serialization_test(size_t iterations)
 {
     using namespace flatbuffers_test;
@@ -524,7 +470,7 @@ main(int argc, char** argv)
 
     if (argc < 2) {
         std::cout << "usage: " << argv[0]
-                  << " N [thrift-binary thrift-compact protobuf boost msgpack cereal avro capnproto flatbuffers yas yas-compact]";
+                  << " N [thrift-binary thrift-compact protobuf boost msgpack cereal capnproto flatbuffers yas yas-compact]";
         std::cout << std::endl << std::endl;
         std::cout << "arguments: " << std::endl;
         std::cout << " N  -- number of iterations" << std::endl << std::endl;
@@ -580,10 +526,6 @@ main(int argc, char** argv)
 
         if (names.empty() || names.find("cereal") != names.end()) {
             cereal_serialization_test(iterations);
-        }
-
-        if (names.empty() || names.find("avro") != names.end()) {
-            avro_serialization_test(iterations);
         }
 
         if (names.empty() || names.find("flatbuffers") != names.end()) {
